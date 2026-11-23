@@ -5,12 +5,14 @@ import { AREAS, GYRI } from "./aree.js";
 const $ = (s) => document.querySelector(s);
 const canvas = $("#canvas"), tip = $("#tip"), marks = $("#marks");
 const HEMIS = ["lh", "rh"], SIDE = { lh: "left", rh: "right" };
-const CENTER = new THREE.Vector3(0, -18, 14); // mm, fsaverage RAS space
 const ras = (x, y, z) => new THREE.Vector3(x, z, -y); // RAS (right, anterior, superior) -> three (y up)
 
 // ---------- data ----------
-const bin = async (f, T) => new T(await (await fetch(`data/${f}`)).arrayBuffer());
-const meta = await (await fetch("data/meta.json")).json();
+const DATA = "data";
+const bin = async (f, T) => new T(await (await fetch(`${DATA}/${f}`)).arrayBuffer());
+const meta = await (await fetch(`${DATA}/meta.json`)).json();
+// centre of the cerebrum in surface RAS mm: middle of the MRI bounding box, raised a little above the cerebellum
+const CENTER = new THREE.Vector3(...meta.volume.origin.map((o, k) => o + meta.volume.shape[k] / 2 + (k === 2 ? 9 : 0)));
 const data = {};
 await Promise.all(HEMIS.map(async (h) => {
   const [pial, infl, nP, nI, faces, ba, gy, sulc] = await Promise.all([

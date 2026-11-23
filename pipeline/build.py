@@ -1,8 +1,10 @@
 """Converte fsaverage (FreeSurfer) in binari compatti per il viewer web.
 
-Uso:  pipeline/.venv/bin/python pipeline/build.py
+Uso:  pipeline/.venv/bin/python pipeline/build.py                      -> cervello medio, web/data/
+      pipeline/.venv/bin/python pipeline/build.py <dir soggetto> <nome>  -> soggetto singolo, web/<nome>/
 Input:  raw/fsaverage/  (scaricato con mne.datasets.fetch_fsaverage)
-Output: web/data/
+        Per un soggetto singolo serve la sua ricostruzione FreeSurfer: le aree di Brodmann, definite su
+        fsaverage, vengono trasferite vertice per vertice attraverso la registrazione sferica (sphere.reg).
 
 Etichette per vertice (uint8):
   1..47  area di Brodmann (annotazione PALS-B12, Van Essen 2005)
@@ -11,16 +13,19 @@ Etichette per vertice (uint8):
   255    parete mediale (non corteccia)
 """
 import json
+import sys
 from pathlib import Path
 
 import nibabel as nib
 import nibabel.freesurfer as fs
 import numpy as np
 from scipy import ndimage
+from scipy.spatial import cKDTree
 
 ROOT = Path(__file__).resolve().parent.parent
-FS = ROOT / "raw" / "fsaverage"
-OUT = ROOT / "web" / "data"
+FSAVG = ROOT / "raw" / "fsaverage"
+FS = Path(sys.argv[1]).resolve() if len(sys.argv) > 2 else FSAVG
+OUT = ROOT / "web" / (sys.argv[2] if len(sys.argv) > 2 else "data")
 OUT.mkdir(parents=True, exist_ok=True)
 
 INFLATED_OFFSET = 46.0  # mm: separa i due emisferi gonfiati
@@ -36,7 +41,7 @@ def normals(v, f):
 
 
 def brodmann_labels(hemi):
-    lab, _, names = fs.read_annot(FS / "label" / f"{hemi}.PALS_B12_Brodmann.annot")
+    lab, _, names = fs.read_annot(FSAVG / "label" / f"{hemi}.PALS_B12_Brodmann.annot")
     names = [x.decode() for x in names]
     ap, _, apn = fs.read_annot(FS / "label" / f"{hemi}.aparc.annot")
     apn = [x.decode() for x in apn]
@@ -48,6 +53,10 @@ def brodmann_labels(hemi):
         elif n == "MEDIAL.WALL":
             lut[i] = 255
     out = lut[np.where(lab < 0, 0, lab)]
+    if FS != FSAVG:  # trasferimento sul soggetto: vertice fsaverage piu' vicino sulla sfera registrata
+        avg, _ = fs.read_geometry(FSAVG / "surf" / f"{hemi}.sphere.reg")
+        sub, _ = fs.read_geometry(FS / "surf" / f"{hemi}.sphere.reg")
+        out = out[cKDTree(avg).query(sub)[1]]
     out[(out == 0) & (ap == apn.index("insula"))] = 48
     out[(ap == 0) & (out == 0)] = 255
     return out, ap.astype(np.uint8), apn
