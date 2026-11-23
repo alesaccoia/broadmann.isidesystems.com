@@ -3,7 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Brodmann Atlas</title>
+<title>Brodmann Atlas: the human cerebral cortex in 3D</title>
+<meta name="description" content="An interactive 3D atlas of Brodmann's areas and the gyri of the human cerebral cortex, with MRI sections and the original plates of 1909. By Alessandro Saccoia, Iside Systems.">
+<meta name="author" content="Alessandro Saccoia">
+<meta name="theme-color" content="#f4f2ed">
+<link rel="canonical" href="https://broadmann.isidesystems.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Brodmann Atlas">
+<meta property="og:title" content="Brodmann Atlas: the human cerebral cortex in 3D">
+<meta property="og:description" content="An interactive 3D atlas of Brodmann's areas and the gyri of the human cerebral cortex, with MRI sections and the original plates of 1909. By Alessandro Saccoia, Iside Systems.">
+<meta property="og:url" content="https://broadmann.isidesystems.com/">
+<meta property="og:image" content="https://broadmann.isidesystems.com/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Lateral view of the human brain with Brodmann's areas outlined and numbered. Brodmann Atlas, by Alessandro Saccoia, Iside Systems.">
+<meta property="og:locale" content="en_GB">
+<meta property="article:author" content="Alessandro Saccoia">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Brodmann Atlas: the human cerebral cortex in 3D">
+<meta name="twitter:description" content="An interactive 3D atlas of Brodmann's areas and the gyri of the human cerebral cortex, with MRI sections and the original plates of 1909. By Alessandro Saccoia, Iside Systems.">
+<meta name="twitter:image" content="https://broadmann.isidesystems.com/assets/og.png">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Brodmann Atlas","url":"https://broadmann.isidesystems.com/","description":"An interactive 3D atlas of Brodmann's areas and the gyri of the human cerebral cortex, with MRI sections and the original plates of 1909. By Alessandro Saccoia, Iside Systems.","applicationCategory":"EducationalApplication","inLanguage":"en","isAccessibleForFree":true,"dateCreated":"2026","image":"https://broadmann.isidesystems.com/assets/og.png","author":{"@type":"Person","name":"Alessandro Saccoia"},"publisher":{"@type":"Organization","name":"Iside Systems","url":"https://www.isidesystems.com/"}}</script>
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
@@ -24,7 +44,7 @@
 *{box-sizing:border-box;font:inherit;font-synthesis:none}
 html,body{height:100%}
 html{background:var(--bg);-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.45 var(--serif);overflow:hidden}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.45 var(--serif);overflow:hidden;display:flex;flex-direction:column}
 .sans{font:400 15px/1.6 var(--sans)}
 ::selection{background:var(--ink);color:var(--bg)}
 button,a{color:var(--dim);background:none;border:0;padding:0;cursor:pointer;text-decoration:none}
@@ -36,7 +56,7 @@ ul{list-style:none}
 i,em,.lab{font-style:italic}
 .dim,.lab{color:var(--dim)}
 
-#app{display:grid;grid-template-columns:270px minmax(0,1fr) 350px;height:100%}
+#app{display:grid;grid-template-columns:270px minmax(0,1fr) 350px;flex:1;min-height:0}
 #index,#card{padding:28px 24px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
 #index{display:flex;flex-direction:column}
 #index header{margin-bottom:1.1em}
@@ -52,8 +72,9 @@ i,em,.lab{font-style:italic}
 #items .n{color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
 #items li:hover .t,#items li.hov .t{text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:4px}
 #items li.sel .t{text-decoration:underline;text-decoration-color:var(--ink);text-underline-offset:4px}
-#index footer{margin-top:1.6em;display:flex;gap:16px;align-items:baseline;color:var(--dim)}
-#index footer span{margin-left:auto}
+#foot{display:flex;gap:16px;align-items:baseline;color:var(--dim);padding:8px 24px 12px;border-top:1px solid color-mix(in srgb,var(--line) 45%,transparent)}
+#foot span{margin-left:auto}
+#foot a{text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:4px}
 
 #scene{position:relative;min-width:0;min-height:0;overflow:hidden}
 #scene canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
@@ -99,7 +120,8 @@ dialog a{color:inherit;text-decoration:underline;text-decoration-color:var(--lin
 dialog form{margin-top:1.4em}
 
 @media (max-width:980px){
-  body{overflow:auto;font-size:16px}
+  body{overflow:auto;font-size:16px;display:block}
+  #foot{padding:12px 16px 20px;flex-wrap:wrap}
   .sans{font-size:14px}
   #app{display:flex;flex-direction:column;height:auto}
   #scene{height:70vh;order:-1}
@@ -124,11 +146,6 @@ dialog form{margin-top:1.4em}
     </div>
     <input id="find" type="search" placeholder="Find" autocomplete="off" spellcheck="false" aria-label="Find an area or a gyrus">
     <ul id="items" class="sans"></ul>
-    <footer>
-      <button id="open-help">Help</button>
-      <button id="open-about">About</button>
-      <span>2026</span>
-    </footer>
   </aside>
 
   <main id="scene">
@@ -157,6 +174,11 @@ dialog form{margin-top:1.4em}
 
   <aside id="card"></aside>
 </div>
+<footer id="foot">
+  <button id="open-help">Help</button>
+  <button id="open-about">About</button>
+  <span>© 2026 Alessandro Saccoia · <a href="https://www.isidesystems.com/" target="_blank" rel="noopener">Iside Systems</a></span>
+</footer>
 <div id="tip"></div>
 
 <dialog id="help">
@@ -181,6 +203,6 @@ dialog form{margin-top:1.4em}
   <p class="dim">The boundaries are a group average projected on an average brain. Brodmann's areas are defined by cytoarchitecture and vary from one brain to the next. Areas 12, 34 and 52 are missing from the surface, the insula is not subdivided, and some cortex around the lateral sulcus carries no area. The descriptions are study summaries, not a clinical reference.</p>
   <form method="dialog"><button>Close</button></form>
 </dialog>
-<script type="module" src="app.js?v=13"></script>
+<script type="module" src="app.js?v=14"></script>
 </body>
 </html>

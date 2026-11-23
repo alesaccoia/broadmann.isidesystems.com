@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- Social sharing card, 1200x630. Serve the repository root and screenshot this page; see README. -->
+<html lang="en"><head><meta charset="utf-8"><title>card</title>
+<style>
+@font-face{font-family:"Inter";src:url("/web/fonts/inter-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"ET Book";src:url("/web/fonts/et-book-roman.woff") format("woff")}
+@font-face{font-family:"ET Book";font-style:italic;src:url("/web/fonts/et-book-italic.woff") format("woff")}
+html,body{margin:0;width:1200px;height:630px;overflow:hidden;background:#f4f2ed;color:#111}
+iframe{position:absolute;left:380px;top:-30px;width:860px;height:690px;border:0}
+div{position:absolute;left:64px;top:64px;bottom:60px;width:420px;display:flex;flex-direction:column}
+h1{margin:0;font:400 40px/1.15 "Inter",sans-serif;letter-spacing:-.01em}
+p{margin:0;font:400 27px/1.3 "ET Book",serif}
+.sub{font-style:italic;color:#6e6b64;margin-top:10px}
+.by{margin-top:auto;font-size:23px}
+.by span{color:#6e6b64}
+</style></head><body>
+<iframe src="/web/index.html" id="f"></iframe>
+<div><h1>Brodmann Atlas</h1><p class="sub">The human cerebral cortex,<br>area by area, in three dimensions</p>
+<p class="by">Alessandro Saccoia<br><span>Iside Systems · broadmann.isidesystems.com</span></p></div>
+<script>
+document.getElementById("f").addEventListener("load", (e) => {
+  const d = e.target.contentDocument, s = d.createElement("style");
+  s.textContent = "#index,#card,#controls,footer{display:none!important}#app{display:block!important;height:100%!important}#scene{height:100%!important}#marks span{font-size:13px!important}";
+  d.head.append(s);
+});
+</script></body></html>
