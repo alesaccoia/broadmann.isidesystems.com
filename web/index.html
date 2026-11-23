@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brodmann Atlas</title>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+<style>
+@font-face{font-family:"Inter";font-style:normal;font-weight:400;font-display:swap;
+  src:url("fonts/inter-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"ET Book";font-style:normal;font-weight:400;font-display:swap;
+  src:url("fonts/et-book-roman.woff") format("woff")}
+@font-face{font-family:"ET Book";font-style:italic;font-weight:400;font-display:swap;
+  src:url("fonts/et-book-italic.woff") format("woff")}
+
+/* Two voices. Inter (as on isidesystems.com) names things: title, areas, numbers.
+   ET Book says everything else: controls, labels, prose. One size each, one weight. */
+:root{--bg:#f4f2ed;--ink:#111;--dim:#6e6b64;--line:#b5b2aa;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  --serif:"ET Book",Palatino,"Palatino Linotype","Book Antiqua",Georgia,serif}
+*{box-sizing:border-box;font:inherit;font-synthesis:none}
+html,body{height:100%}
+html{background:var(--bg);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.45 var(--serif);overflow:hidden}
+.sans{font:400 15px/1.6 var(--sans)}
+::selection{background:var(--ink);color:var(--bg)}
+button,a{color:var(--dim);background:none;border:0;padding:0;cursor:pointer;text-decoration:none}
+button:hover,a:hover{color:var(--ink)}
+button[aria-pressed="true"]{color:var(--ink);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}
+:focus-visible{outline:1px solid var(--ink);outline-offset:2px}
+h1,h2,p,ul,figure{margin:0;padding:0}
+ul{list-style:none}
+i,em,.lab{font-style:italic}
+.dim,.lab{color:var(--dim)}
+
+#app{display:grid;grid-template-columns:270px minmax(0,1fr) 350px;height:100%}
+#index,#card{padding:28px 24px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+#index{display:flex;flex-direction:column}
+#index header{margin-bottom:1.1em}
+#tabs{display:flex;gap:16px;margin-bottom:.5em}
+#find{width:100%;color:var(--ink);background:none;border:0;border-radius:0;border-bottom:1px solid var(--line);
+  padding:0 0 2px;outline:0;caret-color:var(--ink);margin-bottom:1em}
+#find:focus{border-bottom-color:var(--ink)}
+#find::placeholder{color:var(--dim);font-style:italic}
+#find::-webkit-search-cancel-button{display:none}
+#items{flex:1}
+#items li{display:grid;grid-template-columns:1.6em 1fr;gap:0 12px;align-items:baseline;cursor:pointer;color:var(--ink)}
+#items.plain li{grid-template-columns:1fr}
+#items .n{color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
+#items li:hover .t,#items li.hov .t{text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:4px}
+#items li.sel .t{text-decoration:underline;text-decoration-color:var(--ink);text-underline-offset:4px}
+#index footer{margin-top:1.6em;display:flex;gap:16px;align-items:baseline;color:var(--dim)}
+#index footer span{margin-left:auto}
+
+#scene{position:relative;min-width:0;min-height:0;overflow:hidden}
+#scene canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#scene canvas.pick{cursor:pointer}
+#marks{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+#marks span{position:absolute;left:0;top:0;font:400 11px/1 var(--sans);color:var(--ink);white-space:nowrap;
+  text-shadow:0 0 2px var(--bg),0 0 2px var(--bg),0 0 3px var(--bg);will-change:transform}
+#controls{position:absolute;left:16px;top:28px;display:grid;grid-template-columns:auto auto;gap:.1em 18px;justify-content:start;pointer-events:none}
+#controls .opts{display:flex;flex-wrap:wrap;gap:0 14px;align-items:baseline}
+#controls .gap{margin-left:10px}
+#controls button,#controls input{pointer-events:auto}
+input[type=range]{-webkit-appearance:none;appearance:none;width:150px;height:14px;background:none;margin:0;cursor:pointer;align-self:center}
+input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--line)}
+input[type=range]::-moz-range-track{height:1px;background:var(--line)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:1px;height:11px;background:var(--ink);border-radius:0;margin-top:-5px;box-shadow:0 0 0 .5px var(--ink)}
+input[type=range]::-moz-range-thumb{width:2px;height:11px;background:var(--ink);border:0;border-radius:0}
+#status{position:absolute;left:16px;bottom:24px;color:var(--dim);font-style:italic;pointer-events:none}
+#tip{position:fixed;pointer-events:none;color:var(--ink);background:color-mix(in srgb,var(--bg) 88%,transparent);padding:0 6px;
+  white-space:nowrap;transform:translate(14px,12px);display:none;z-index:5}
+
+#card h2{margin-bottom:.1em}
+#card .sub{color:var(--dim);font-style:italic}
+#card dl{margin:1.3em 0 0;display:grid;grid-template-columns:4.6em 1fr;gap:.55em 12px}
+#card dt{color:var(--dim);font-style:italic}
+#card dd{margin:0}
+#card table{border-collapse:collapse;width:100%}
+#card td{padding:0;vertical-align:baseline}
+#card td.pc{text-align:right;font-variant-numeric:tabular-nums;width:2.6em;color:var(--dim)}
+#card td.bar{width:44px;padding-left:8px}
+#card td.bar b{display:block;height:1px;background:var(--ink);transform:translateY(-.3em)}
+#card figure{margin-top:1.6em}
+#card figure img{display:block;width:100%;height:auto;mix-blend-mode:multiply}
+#card figcaption{color:var(--dim);font-style:italic;margin-top:.5em}
+
+dialog{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:0;padding:28px 32px;max-width:520px;width:calc(100% - 32px)}
+dialog::backdrop{background:color-mix(in srgb,var(--bg) 78%,transparent)}
+dialog h2{margin-bottom:1em}
+dialog p+p{margin-top:.8em}
+dialog dl{margin:0;display:grid;grid-template-columns:7.5em 1fr;gap:.3em 16px}
+dialog dt{color:var(--dim);font-style:italic}
+dialog dd{margin:0}
+dialog a{color:inherit;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:4px}
+dialog form{margin-top:1.4em}
+
+@media (max-width:980px){
+  body{overflow:auto;font-size:16px}
+  .sans{font-size:14px}
+  #app{display:flex;flex-direction:column;height:auto}
+  #scene{height:70vh;order:-1}
+  #index,#card{overflow:visible;padding:20px 16px}
+  #items{columns:2;column-gap:24px}
+  #items li{break-inside:avoid}
+  #controls{top:12px;right:16px}
+  input[type=range]{width:110px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="index">
+    <header>
+      <h1 class="sans">Brodmann Atlas</h1>
+      <p class="sub dim"><i>Human cerebral cortex</i></p>
+    </header>
+    <div id="tabs">
+      <button data-map="0" aria-pressed="true">Areas</button>
+      <button data-map="1" aria-pressed="false">Gyri</button>
+    </div>
+    <input id="find" type="search" placeholder="Find" autocomplete="off" spellcheck="false" aria-label="Find an area or a gyrus">
+    <ul id="items" class="sans"></ul>
+    <footer>
+      <button id="open-help">Help</button>
+      <button id="open-about">About</button>
+      <span>2026</span>
+    </footer>
+  </aside>
+
+  <main id="scene">
+    <canvas id="canvas"></canvas>
+    <div id="marks"></div>
+    <div id="controls">
+      <span class="lab">Hemisphere</span>
+      <div class="opts" id="hemis"></div>
+      <span class="lab">View</span>
+      <div class="opts" id="views"></div>
+      <span class="lab">Surface</span>
+      <div class="opts"><span class="dim">pial</span><input id="inflate" type="range" min="0" max="1" step="0.01" value="0" aria-label="Inflate the cortex"><span class="dim">inflated</span></div>
+      <span class="lab">Section</span>
+      <div class="opts">
+        <button data-cut="-1" aria-pressed="true">none</button>
+        <button data-cut="0" aria-pressed="false">sagittal</button>
+        <button data-cut="1" aria-pressed="false">coronal</button>
+        <button data-cut="2" aria-pressed="false">axial</button>
+        <input id="cut" type="range" min="0" max="1" step="0.002" value="0.5" hidden aria-label="Position of the section">
+        <span id="mm" class="dim"></span>
+        <button id="flip" hidden>flip</button>
+      </div>
+    </div>
+    <div id="status">Loading…</div>
+  </main>
+
+  <aside id="card"></aside>
+</div>
+<div id="tip"></div>
+
+<dialog id="help">
+  <h2 class="sans">Help</h2>
+  <dl>
+    <dt>Drag</dt><dd>Rotate the brain.</dd>
+    <dt>Scroll</dt><dd>Zoom. Right-drag to pan.</dd>
+    <dt>Hover</dt><dd>Name the area, the gyrus and the hemisphere under the pointer.</dd>
+    <dt>Click</dt><dd>Select an area and open its card. Click it again, or press Esc, to clear.</dd>
+    <dt>Surface</dt><dd>Inflate the cortex to bring out what lies inside the sulci.</dd>
+    <dt>Section</dt><dd>Cut the brain and show the MRI with the areas in the cortical ribbon.</dd>
+    <dt>Areas, Gyri</dt><dd>Switch between Brodmann's areas and the gyri.</dd>
+  </dl>
+  <form method="dialog"><button>Close</button></form>
+</dialog>
+
+<dialog id="about">
+  <h2 class="sans">Brodmann Atlas</h2>
+  <p>An interactive study atlas of the human cerebral cortex, after Korbinian Brodmann's map of 1909.</p>
+  <p>Made by Alessandro Saccoia, <a href="https://www.isidesystems.com/" target="_blank" rel="noopener">Iside Systems</a>, Milan, 2026.</p>
+  <p class="dim">Surfaces and MRI are the FreeSurfer <i>fsaverage</i> average brain. Area boundaries come from the PALS-B12 Brodmann annotation (Van Essen, 2005), gyri from the Desikan–Killiany atlas (2006). Plates are from Brodmann, <i>Vergleichende Lokalisationslehre der Grosshirnrinde</i>, 1909, via Wikimedia Commons.</p>
+  <p class="dim">The boundaries are a group average projected on an average brain. Brodmann's areas are defined by cytoarchitecture and vary from one brain to the next. Areas 12, 34 and 52 are missing from the surface, the insula is not subdivided, and some cortex around the lateral sulcus carries no area. The descriptions are study summaries, not a clinical reference.</p>
+  <form method="dialog"><button>Close</button></form>
+</dialog>
+<script type="module" src="app.js?v=9"></script>
+</body>
+</html>

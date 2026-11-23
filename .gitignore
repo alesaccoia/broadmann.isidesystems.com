@@ -1,0 +1,8 @@
+raw/
+pipeline/.venv/
+.DS_Store
+__pycache__/
+# separate viewer, not part of this site
+tavole-sfogliabili/
+# modern recoloured map of unverified licence, unused by the site
+web/tavole/tutte.png
