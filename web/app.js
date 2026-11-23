@@ -98,7 +98,19 @@ scene.add(group);
 const U = {
   uPal: { value: palTex }, uMode: { value: 0 }, uSel: { value: -1 }, uHov: { value: -1 }, uMix: { value: 0 },
   uPick: { value: 0 }, uCut: { value: -1 }, uCutPos: { value: 0 }, uSide: { value: 1 },
+  uIds: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
 };
+// Area boundaries are drawn in screen space: the area ids are first rendered to a buffer the size of the
+// canvas, then each pixel of the cortex compares its id with its neighbours'. Lines keep the same hairline
+// width at any zoom.
+const idTarget = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+const noIds = new THREE.DataTexture(new Uint8Array(4), 1, 1); noIds.needsUpdate = true;
+U.uIds.value = noIds;
+function renderIds(target) { // never sample the id buffer while drawing into it
+  U.uIds.value = noIds; U.uPick.value = 1;
+  renderer.setRenderTarget(target); renderer.clear(); renderer.render(scene, camera);
+  renderer.setRenderTarget(null); U.uPick.value = 0; U.uIds.value = idTarget.texture;
+}
 const GLSL_COLOR = /* glsl */ `
 uniform sampler2D uPal; uniform int uMode; uniform float uSel, uHov;
 const vec3 BASE = vec3(0.910, 0.894, 0.859);
@@ -130,8 +142,14 @@ const cortexMaterial = (hemi) => new THREE.ShaderMaterial({
       gl_Position = projectionMatrix * modelViewMatrix * vec4(vP, 1.0);
     }`,
   fragmentShader: /* glsl */ `
-    uniform int uPick; uniform float uHemi, uCut, uCutPos, uSide, uMix;
+    uniform int uPick; uniform int uMode; uniform float uHemi, uCut, uCutPos, uSide, uMix;
+    uniform sampler2D uIds; uniform vec2 uRes;
     varying vec3 vN; varying vec3 vCol; varying float vSulc; varying vec3 vP; varying float vId;
+    float idAt(vec2 off) { // id of the area at a neighbouring pixel, -1 off the cortex of this hemisphere
+      vec4 t = texture2D(uIds, (gl_FragCoord.xy + off) / uRes);
+      if (t.a < 0.5 || abs(t.g * 255.0 - (uHemi + 1.0)) > 0.5) return -1.0;
+      return floor((uMode == 0 ? t.r : t.b) * 255.0 + 0.5);
+    }
     flat varying vec3 vIds;
     void main() {
       if (uCut > -0.5) {
@@ -143,8 +161,12 @@ const cortexMaterial = (hemi) => new THREE.ShaderMaterial({
       float d = max(normalize(vN).z, 0.0);
       float light = 0.52 + 0.48 * pow(d, 0.8);
       light *= 1.0 - mix(0.24, 0.10, uMix) * smoothstep(-0.15, 0.55, vSulc);
-      float border = fwidth(vId) > 0.0001 ? 1.0 : 0.0; // triangles that straddle two areas
-      gl_FragColor = vec4(vCol * light * (1.0 - 0.42 * border), 1.0);
+      float me = idAt(vec2(0.0)), border = 0.0;
+      if (me >= 0.0) {
+        float a = idAt(vec2(1.0, 0.0)), b = idAt(vec2(0.0, 1.0));
+        if ((a >= 0.0 && a != me) || (b >= 0.0 && b != me)) border = 1.0;
+      }
+      gl_FragColor = vec4(mix(vCol * light, vec3(0.30, 0.29, 0.27), 0.62 * border), 1.0);
     }`,
 });
 
@@ -398,10 +420,8 @@ function placeMarks() {
   // render area ids to a small buffer and look the anchor up in it
   const sw = Math.max(1, Math.round(w / SEEN)), sh = Math.max(1, Math.round(hgt / SEEN));
   if (sw !== seenW || sh !== seenH) { seenW = sw; seenH = sh; seenTarget.setSize(sw, sh); seen = new Uint8Array(sw * sh * 4); }
-  U.uPick.value = 1;
-  renderer.setRenderTarget(seenTarget); renderer.clear(); renderer.render(scene, camera);
+  renderIds(seenTarget);
   renderer.readRenderTargetPixels(seenTarget, 0, 0, sw, sh, seen);
-  renderer.setRenderTarget(null); U.uPick.value = 0;
   const eye = camera.position, own = (x, y, l) => {
     const k = 4 * (Math.min(sh - 1, Math.max(0, Math.floor((hgt - y) / SEEN))) * sw + Math.min(sw - 1, Math.max(0, Math.floor(x / SEEN))));
     return seen[k] === l.id && seen[k + 1] === (l.h === "lh" ? 1 : 2);
@@ -442,10 +462,9 @@ const target = new THREE.WebGLRenderTarget(1, 1), px = new Uint8Array(4);
 function pick(ev) {
   const r = canvas.getBoundingClientRect();
   camera.setViewOffset(r.width, r.height, ev.clientX - r.left, ev.clientY - r.top, 1, 1);
-  U.uPick.value = 1;
-  renderer.setRenderTarget(target); renderer.clear(); renderer.render(scene, camera);
+  renderIds(target);
   renderer.readRenderTargetPixels(target, 0, 0, 1, 1, px);
-  renderer.setRenderTarget(null); U.uPick.value = 0; camera.clearViewOffset();
+  camera.clearViewOffset();
   if (!px[3] || !px[1]) return null;
   const ba = px[0], gy = px[2], id = mode === 0 ? ba : gy;
   return { id: known(mode, id) ? id : -1, ba, gy, hemi: HEMIS[px[1] - 1] };
@@ -494,6 +513,7 @@ addEventListener("keydown", (e) => {
 function resize() {
   const r = canvas.parentElement.getBoundingClientRect();
   renderer.setSize(r.width, r.height, false);
+  renderer.getDrawingBufferSize(U.uRes.value); idTarget.setSize(U.uRes.value.x, U.uRes.value.y);
   camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); dirty = true;
 }
 new ResizeObserver(resize).observe(canvas.parentElement);
@@ -511,7 +531,7 @@ function frame(now) {
     dirty = true;
   } else
   controls.update();
-  if (dirty) { dirty = false; renderer.render(scene, camera); followMarks(); }
+  if (dirty) { dirty = false; renderIds(idTarget); renderer.render(scene, camera); followMarks(); }
 }
 buildIndex(); buildMarks(); drawCard();
 $("#status").textContent = "";
